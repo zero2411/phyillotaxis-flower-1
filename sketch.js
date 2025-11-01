@@ -382,7 +382,7 @@ function saveAsSvg() {
   // Add spirals to SVG as smooth Bezier curves
   function bezierSpiralPath(points) {
     if (points.length < 2) return '';
-    let d = M `${points[0].x} ${points[0].y}` ;
+    let d = `M ${points[0].x} ${points[0].y}` ;
     for (let i = 1; i < points.length - 2; i++) {
       let p0 = points[i - 1];
       let p1 = points[i];
