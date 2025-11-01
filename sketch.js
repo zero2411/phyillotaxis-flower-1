@@ -1,54 +1,165 @@
-// n is a counter for the seeds
-let n = 0;
-// c is a constant that affects the spacing of the seeds
-let c = 2;
-// scale is a scaling factor for the positions of the seeds
-let scale = 10;
-// seeds is an array to store the seed objects
-let seeds = [];
+// CodingTrain: https://www.youtube.com/watch?v=KWoJgHFYWxY&t=661s
+// Wikipedia: https://en.wikipedia.org/wiki/Phyllotaxis
+// Algorithmic Botany - Phyllotaxis: http://algorithmicbotany.org/papers/a...
+// https://thesmarthappyproject.com/fibonacci-in-a-sunflower/
 
+let goldenAngle = 137.5 / 1.00; // The golden angle in degrees
+let c = 0.6;// constant that affects the spacing of the seeds
+let scale = 52;// scale is a scaling factor for the positions of the seeds
+let offsetAngle = 5; // offset for seed placement
+
+let cSlider, scaleSlider, offsetSlider;
+let seeds = [];// seeds is an array to store the seed objects
+let spiralPoints = [];// seeds is an array to store the seed objects
+let numberOfSeeds = 21 * 15; // Total number of seeds
+let numberOfSpiralPoints = 21 * 17; // Total number of seeds
+let minSeedSize = 4; // Minimum seed size
+let maxSeedSize = 6; // Maximum seed size
+let textSize = 12;  // Font size for seed numbers
+let holeSize = 3; // Size of the holes
+let seedSize = 6; // Size of the seeds
+let triangleSize = 10; // Size of the triangle around each seed
 
 // setup() is called once when the program starts
 function setup() {
-  createCanvas(800, 800);
+  // Slider labels
+  cLabel = createDiv('Spacing (c):');
+  scaleLabel = createDiv('Scale:');
+  offsetLabel = createDiv('Offset Angle:');
+  cLabel.style('color', '#fff');
+  scaleLabel.style('color', '#fff');
+  offsetLabel.style('color', '#fff');
+  createCanvas(1200, 1200);
   background(0);
-  angleMode(DEGREES)
-  // The golden angle in degrees
-  goldenAngle = 137.5;
+  angleMode(DEGREES);
 
-  // Initialize Voronoi
+  // Sliders
+  cSlider = createSlider(0.1, 2.0, c, 0.01);
+  scaleSlider = createSlider(5, 100, scale, 1);
+  offsetSlider = createSlider(0, 10, offsetAngle, 0.1);
+  cSlider.style('width', '200px');
+  scaleSlider.style('width', '200px');
+  offsetSlider.style('width', '200px');
+  positionSliders();
+
+  updatePattern();
+}
+
+function positionSliders() {
+  // Place sliders and labels below the canvas
+  let yBase = height - 120;
+  cLabel.position(10, yBase);
+  cSlider.position(10, yBase + 15);
+  scaleLabel.position(10, yBase + 35);
+  scaleSlider.position(10, yBase + 50);
+  offsetLabel.position(10, yBase + 70);
+  offsetSlider.position(10, yBase + 90);
+}
+
+function windowResized() {
+  positionSliders();
+}
+
+// draw() is called repeatedly
+function draw() {
+  // Only redraw if slider values changed
+  if (
+    c !== cSlider.value() ||
+    scale !== scaleSlider.value() ||
+    offsetAngle !== offsetSlider.value()
+  ) {
+    c = cSlider.value();
+    scale = scaleSlider.value();
+    offsetAngle = offsetSlider.value();
+    updatePattern();
+  }
+}
+
+function updatePattern() {
+  background(0);
+  seeds = [];
+  spiralPoints = [];
+  // Recreate seeds and spiral points
+  createSeeds(numberOfSeeds);
+  createSpiralPoints(numberOfSpiralPoints, offsetAngle);
+  // Recompute Voronoi
   voronoi = new Voronoi();
-
-  // Create the seeds
-  createSeeds(21 * 15);
-
-  // Define the bounding box for the Voronoi diagram
   let bbox = {
     xl: 0,
     xr: width,
     yt: 0,
     yb: height
   };
-
-  // Convert seeds to the format expected by the Voronoi library
   let sites = seeds.map(seed => ({ x: seed.x, y: seed.y }));
-
-  // Compute Voronoi diagram with proper boundaries
   voronoi = voronoi.compute(sites, bbox);
+  // drawVonoroi();
+  // drawHoles();
+  drawSpirals();
+  drawSeeds();
+  drawCenter();
+
+  console.log(`c=${c}, scale=${scale}, offsetAngle=${offsetAngle}`);
 }
 
-// draw() is called repeatedly
-function draw() {
-  background(0);
 
-  drawSeeds();
+// Draws 21 parastichy spirals by connecting every 21st seed
+const spiralCount = 21;
+function drawSpirals() {
+  stroke(0, 120, 255);
+  strokeWeight(1.5);
+  noFill();
+  // Clockwise spirals
+  for (let s = 0; s < spiralCount; s++) {
+    beginShape();
+    let cx = width / 2;
+    let cy = height / 2;
+    curveVertex(cx, cy); // Start at center
+    curveVertex(cx, cy); // Start at center
+    let x, y;
+    for (let i = s; i < spiralPoints.length; i += spiralCount) {
+      x = spiralPoints[i].x;
+      y = spiralPoints[i].y;
+      curveVertex(x, y);
+    }
+    curveVertex(x, y);
+    endShape();
+  }
 
-  //drawVonoroi();
+  // Counterclockwise spirals (using opposite parastichy number)
+  // Use the next Fibonacci number for classic phyllotaxis
+  const ccwSpiralCount = 34; // For 21, use 34 as the opposite
+  stroke(0, 255, 120);
 
-  //saveAsSvg();
-  
-  // Stop draw() from looping
-  noLoop();
+  for (let s = 0; s < ccwSpiralCount; s++) {
+    beginShape();
+    let cx = width / 2;
+    let cy = height / 2;
+    curveVertex(cx, cy);
+    curveVertex(cx, cy);
+    let x, y;
+    for (let i = s; i < spiralPoints.length; i += ccwSpiralCount) {
+      x = spiralPoints[i].x;
+      y = spiralPoints[i].y;
+      curveVertex(x, y);
+    }
+    curveVertex(x, y);
+    endShape();
+  }
+}
+
+// Creates the seed objects and stores them in the seeds array
+function createSpiralPoints(nSpiralPoints, offsetAngle) {
+  for (let n = 0; n < nSpiralPoints; n++) {
+    // Calculate the angle and radius for the current seed
+    var a = (n * goldenAngle) + offsetAngle;
+    var r = c * sqrt(n);
+    // Calculate the x/y positions and size of the seed
+    var x = width / 2 + r * cos(a) * scale;
+    var y = height / 2 + r * sin(a) * scale;
+    var dynamicSeedSize = map(n, 0, nSpiralPoints, minSeedSize * c, maxSeedSize * c);
+    // Add the seed object to the seeds array
+    spiralPoints.push({ x: x, y: y, size: seedSize });
+  }
 }
 
 // Creates the seed objects and stores them in the seeds array
@@ -60,10 +171,20 @@ function createSeeds(nSeeds) {
     // Calculate the x/y positions and size of the seed
     var x = width / 2 + r * cos(a) * scale;
     var y = height / 2 + r * sin(a) * scale;
-    var size = map(n, 0, nSeeds, 4 * c, 8 * c);
+    var dynamicSeedSize = map(n, 0, nSeeds, minSeedSize * c, maxSeedSize * c);
     // Add the seed object to the seeds array
-    seeds.push({ x: x, y: y, size: size });
+    seeds.push({ x: x, y: y, size: seedSize });
   }
+}
+
+function drawCenter() {
+  // Draw center circle
+  let centerX = width / 2;
+  let centerY = height / 2;
+  let radius = 5; // Slightly smaller than canvas
+  stroke(255, 100);
+  fill(255, 0, 255);
+  ellipse(centerX, centerY, radius * 2, radius * 2);
 }
 
 // Draws the seeds and Voronoi cells on the canvas
@@ -76,7 +197,7 @@ function drawVonoroi() {
   // Calculate circle properties
   let centerX = width / 2;
   let centerY = height / 2;
-  let radius = min(width, height) / 2 - 30; // Slightly smaller than canvas
+  let radius = min(width, height) / 2 - 40; // Slightly smaller than canvas
 
   ellipse(centerX, centerY, radius * 2, radius * 2);
 
@@ -147,11 +268,31 @@ function drawSeeds() {
     // Draw the seed as an ellipse
     ellipse(seed.x, seed.y, seed.size, seed.size);
   }
+
+}
+
+function drawHoles() {
+  // Draw 3 holes in a triangle around each seed
+  for (let i = 0; i < seeds.length; i++) {
+    let seed = seeds[i];
+    let triSize = triangleSize; // global variable for triangle size
+    let angleOffset = 45; // Point one upwards
+    for (let j = 0; j < 3; j++) {
+      let angle = angleOffset + j * 90;
+      let hx = seed.x + triSize * cos(angle);
+      let hy = seed.y + triSize * sin(angle);
+      fill(255, 0, 0);
+      noStroke();
+      ellipse(hx, hy, holeSize, holeSize);
+    }
+  }
+
 }
 
 // Function to save the current state as SVG
 function saveAsSvg() {
-  // Create SVG content
+
+  // Create SVG content with groups
   let svg = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
 <rect width="100%" height="100%" fill="black"/>`;
@@ -162,6 +303,9 @@ function saveAsSvg() {
   let radius = min(width, height) / 2 - 30;
   svg += `<circle cx="${centerX}" cy="${centerY}" r="${radius}" 
           fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>`;
+
+  // Start Voronoi edges group
+  svg += `<g id="voronoi-lines">`;
 
   // Add Voronoi edges
   for (let edge of voronoi.edges) {
@@ -207,19 +351,98 @@ function saveAsSvg() {
     svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" 
             stroke="rgba(255,255,255,0.4)" stroke-width="1"/>`;
   }
+  // End Voronoi edges group
+  svg += `</g>`;
 
+  // Start seeds group
+  svg += `<g id="seeds">`;
   // Add seeds
   for (let seed of seeds) {
-    svg += `<circle cx="${seed.x}" cy="${seed.y}" r="${seed.size/2}" 
+    svg += `<circle cx="${seed.x}" cy="${seed.y}" r="${seed.size / 2}" 
             fill="white"/>`;
   }
+  // End seeds group
+  svg += `</g>`;
+
+  // Starts holes group
+  svg += `<g id="holes">`;
+  for (let i = 0; i < seeds.length; i++) {
+    let seed = seeds[i];
+    let triSize = triangleSize; // global variable for triangle size
+    let angleOffset = 45; // Point one upwards
+    for (let j = 0; j < 3; j++) {
+      let angle = angleOffset + j * 90;
+      let hx = seed.x + triSize * cos(angle);
+      let hy = seed.y + triSize * sin(angle);
+      svg += `<circle cx="${hx}" cy="${hy}" r="${holeSize}" fill="blue"/>`;
+    }
+  }
+  svg += `</g>`;
+
+  // Add spirals to SVG as smooth Bezier curves
+  function bezierSpiralPath(points) {
+    if (points.length < 2) return '';
+    let d = M `${points[0].x} ${points[0].y}` ;
+    for (let i = 1; i < points.length - 2; i++) {
+      let p0 = points[i - 1];
+      let p1 = points[i];
+      let p2 = points[i + 1];
+      let p3 = points[i + 2];
+      // Catmull-Rom to Bezier conversion
+      let cp1x = p1.x + (p2.x - p0.x) / 6;
+      let cp1y = p1.y + (p2.y - p0.y) / 6;
+      let cp2x = p2.x - (p3.x - p1.x) / 6;
+      let cp2y = p2.y - (p3.y - p1.y) / 6;
+      d += `C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}` ;
+    }
+    return d;
+  }
+
+  // CW spirals
+  svg += `<g id="spirals-cw">`;
+  for (let s = 0; s < spiralCount; s++) {
+    let cx = width / 2;
+    let cy = height / 2;
+    let spiralPts = [{ x: cx, y: cy }];
+    for (let i = s; i < spiralPoints.length; i += spiralCount) {
+      spiralPts.push({ x: spiralPoints[i].x, y: spiralPoints[i].y });
+    }
+    let spiralPath = bezierSpiralPath(spiralPts);
+    svg += `<path d="${spiralPath}" stroke="blue" stroke-width="1.5" fill="none"/>`;
+  }
+  svg += `</g>`;
+
+  // CCW spirals
+  svg += `<g id="spirals-ccw">`;
+  const ccwSpiralCount = 34;
+  for (let s = 0; s < ccwSpiralCount; s++) {
+    let cx = width / 2;
+    let cy = height / 2;
+    let spiralPts = [{ x: cx, y: cy }];
+    for (let i = s; i < spiralPoints.length; i += ccwSpiralCount) {
+      spiralPts.push({ x: spiralPoints[i].x, y: spiralPoints[i].y });
+    }
+    let spiralPath = bezierSpiralPath(spiralPts);
+    svg += `<path d="${spiralPath}" stroke="lime" stroke-width="1.5" fill="none"/>`;
+  }
+  svg += `</g>`;
+
+
+  // Start text group with smaller font size for numbers
+  svg += `<g id="seed-numbers" style="font-family: Arial; font-size: ${textSize}px; fill: red; text-anchor: middle; dominant-baseline: central">`;
+  // Add numbers for each seed
+  seeds.forEach((seed, index) => {
+    svg += `<text x="${seed.x}" y="${seed.y + (textSize / 2)}">${index}</text>`;
+  });
+  // End text group
+  svg += `</g>`;
 
   svg += '</svg>';
 
   // Create a Blob containing the SVG content
-  let blob = new Blob([svg], {type: 'image/svg+xml'});
+  let blob = new Blob([svg], { type: 'image/svg+xml' });
   let url = URL.createObjectURL(blob);
-  
+
   // Create a temporary link and trigger download
   let link = document.createElement('a');
   link.href = url;
